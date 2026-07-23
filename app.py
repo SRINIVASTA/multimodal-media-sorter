@@ -3,23 +3,64 @@ import cv2
 import numpy as np
 import tempfile
 import os
+import requests
 from io import BytesIO
 from PIL import Image
 from sentence_transformers import SentenceTransformer
 
-# 1. Page layout and header initialization
+# Page layout and header initialization
 st.set_page_config(page_title="Universal Media Organizer", layout="wide")
 st.title("📂 Free Multi-Source Unsupervised Media Organizer")
-st.write("Test with built-in cloud samples, upload external local assets, or combine both sources seamlessly.")
+st.write("Test with built-in downloaded cloud samples, upload external local assets, or combine both sources seamlessly.")
+def load_and_sync_samples():
+    """Reads external samples.config file and downloads missing assets onto the server disk."""
+    local_target_directory = "raw_unorganized_files"
+    os.makedirs(local_target_directory, exist_ok=True)
+    
+    config_file = "samples.config"
+    sample_manifest = []
+    
+    # Check if the configuration file exists
+    if not os.path.exists(config_file):
+        st.error(f"Missing configuration file: '{config_file}' in repository root.")
+        return []
+        
+    # Read lines and download assets dynamically
+    with open(config_file, "r") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):  # Ignore empty lines and comments
+                try:
+                    filename, url = line.split(",", 1)
+                    full_file_path = os.path.join(local_target_directory, filename.strip())
+                    
+                    # Performance Guard: Only download if it's missing from server drive
+                    if not os.path.exists(full_file_path):
+                        try:
+                            response = requests.get(url.strip(), timeout=15)
+                            if response.status_code == 200:
+                                with open(full_file_path, "wb") as file_handler:
+                                    file_handler.write(response.content)
+                        except Exception as download_error:
+                            print(f"Failed streaming {filename}: {download_error}")
+                            
+                    # Add to manifest queue if file successfully exists on disk
+                    if os.path.exists(full_file_path):
+                        sample_manifest.append({"name": filename.strip(), "path": full_file_path})
+                except ValueError:
+                    st.warning(f"Skipping malformed config line: '{line}'")
+                    
+    return sample_manifest
 
-# 2. Setup and cache the AI architecture 
+# Automatically parse config and trigger setup sync on app initialization
+SAMPLE_MANIFEST = load_and_sync_samples()
+# Setup and cache the AI architecture 
 @st.cache_resource
 def load_clip_model():
     return SentenceTransformer('clip-ViT-B-32')
 
 model = load_clip_model()
 
-# 3. Helper Functions for Processing Visual Frameworks
 def extract_video_frame(file_bytes, ext):
     """Slices open a video data stream and returns the core middle frame."""
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_file:
@@ -36,25 +77,7 @@ def extract_video_frame(file_bytes, ext):
     if success:
         return Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     return None
-
-def fetch_sample_bytes(sample_name):
-    """Generates a clean synthetic image in-memory to prevent web link dropouts completely."""
-    if "cat" in sample_name.lower():
-        color = [210, 105, 30]   # Chocolate Brown tint
-    elif "car" in sample_name.lower():
-        color = [220, 20, 60]    # Crimson Red tint
-    elif "nature" in sample_name.lower():
-        color = [34, 139, 34]    # Forest Green tint
-    else:
-        color = [128, 128, 128]  # Slate Grey tint
-        
-    img_array = np.full((300, 300, 3), color, dtype=np.uint8)
-    image = Image.fromarray(img_array)
-    buf = BytesIO()
-    image.save(buf, format="JPEG")
-    return buf.getvalue()
-
-# 4. Interactive Sidebar Configuration Panel
+# Interactive Sidebar Configuration Panel
 st.sidebar.header("🕹️ Control Dashboard")
 raw_concepts = st.sidebar.text_input("Target Grouping Keywords:", "cat, dog, car, nature")
 concepts = [c.strip().lower() for c in raw_concepts.split(",") if c.strip()]
@@ -63,31 +86,24 @@ confidence_threshold = st.sidebar.slider("AI Confidence Cutoff Threshold", 0.0, 
 st.sidebar.write("---")
 st.sidebar.subheader("📦 Data Source Options")
 
-# Option #1: The Built-in Testing Samples toggle checkbox
+# Checkbox option to include the background-downloaded test samples
 use_samples = st.sidebar.checkbox("Load Built-In Cloud Samples", value=True, 
-                                  help="Enables quick system testing with generated images if you don't have local files ready.")
+                                  help="Enables quick system testing with dynamically synced repository files.")
 
-# Fixed internal sample system
-SAMPLE_URLS = [
-    {"name": "internal_sample_cat.jpg", "url": "local"},
-    {"name": "internal_sample_car.jpg", "url": "local"},
-    {"name": "internal_sample_nature.jpg", "url": "local"}
-]
-
-# Primary list to hold combined inputs
+# Primary processing queue list
 aggregated_media_queue = []
 
-# Process Sample Files if checked
-if use_samples:
-    st.sidebar.caption("🟢 Live Cloud Samples active.")
-    for sample in SAMPLE_URLS:
+# Method 1: Feed files dynamically from server storage if synced manifest exists
+if use_samples and SAMPLE_MANIFEST:
+    st.sidebar.caption(f"🟢 Synchronized {len(SAMPLE_MANIFEST)} Cloud Samples active.")
+    for sample in SAMPLE_MANIFEST:
         aggregated_media_queue.append({
             "name": sample["name"],
-            "data_source": "url",
-            "url_link": sample["url"]
+            "data_source": "server_disk",
+            "file_path": sample["path"]
         })
 
-# Option #2: External Upload drag-and-drop module
+# Method 2: Feed external uploaded files from drag-and-drop panel
 st.subheader("📤 External Uploads Panel")
 external_files = st.file_uploader(
     "Drag and drop files from your device to combine them with the cloud samples:", 
@@ -99,13 +115,9 @@ if external_files:
     for f in external_files:
         aggregated_media_queue.append({
             "name": f.name,
-            "data_source": "bytes",
+            "data_source": "user_bytes",
             "raw_bytes": f.read()
         })
-
-# ========================================================
-# CORE MULTIMODAL ALL-IN-ONE PIPELINE
-# ========================================================
 if aggregated_media_queue and concepts:
     st.write("---")
     st.subheader("⚙️ Unified AI Processing Lane")
@@ -114,9 +126,9 @@ if aggregated_media_queue and concepts:
     concept_embeddings = model.encode([f"a photo of a {c}" for c in concepts])
     concept_embeddings = concept_embeddings / np.linalg.norm(concept_embeddings, axis=1, keepdims=True)
     
-    # Initialize dictionary categorization buckets
+    # Initialize categorization buckets
     output_buckets = {c: [] for c in concepts}
-    output_buckets["unclassified"] = []  # The Ungrouped bucket
+    output_buckets["unclassified"] = []  # Explicitly preserve the ungrouped bucket
     
     for asset in aggregated_media_queue:
         name = asset["name"]
@@ -126,20 +138,22 @@ if aggregated_media_queue and concepts:
             
         target_bytes = None
         
-        # Route file content extraction paths based on source location
-        if asset["data_source"] == "bytes":
+        # Pull raw file bytes depending on where the item originated
+        if asset["data_source"] == "user_bytes":
             target_bytes = asset["raw_bytes"]
-        elif asset["data_source"] == "url":
-            with st.spinner(f"Generating memory asset matrix: {name}..."):
-                target_bytes = fetch_sample_bytes(asset["name"])
+            origin_type = "External Upload"
+        elif asset["data_source"] == "server_disk":
+            with open(asset["file_path"], "rb") as disk_file:
+                target_bytes = disk_file.read()
+            origin_type = "Built-In Sample"
                 
         if target_bytes is None:
-            st.error(f"Skipped asset line item processing for: {name}")
+            st.error(f"Skipped processing for: {name}")
             continue
             
         parsed_visual_matrix = None
         
-        # Decode data stream blocks into raw AI visual frames
+        # Decode binary stream into an AI-ready visual matrix
         if file_extension in ['.png', '.jpg', '.jpeg', '.webp']:
             try:
                 parsed_visual_matrix = Image.open(BytesIO(target_bytes)).convert("RGB")
@@ -149,23 +163,21 @@ if aggregated_media_queue and concepts:
             parsed_visual_matrix = extract_video_frame(target_bytes, file_extension)
             
         if parsed_visual_matrix is not None:
-            # Execute feature array mapping extraction
+            # Extract features and normalize vector weights
             extracted_vector = model.encode(parsed_visual_matrix)
             extracted_vector = extracted_vector / np.linalg.norm(extracted_vector)
             
-            # Match matrix coordinates against target concept anchors
+            # Run comparison math against user tags
             match_scores = np.dot(concept_embeddings, extracted_vector)
             top_match_idx = np.argmax(match_scores)
             max_confidence_score = match_scores[top_match_idx]
             
-            # Categorize the item based on the threshold setting
+            # Map item to a keyword folder or send it to the ungrouped folder
             if max_confidence_score >= confidence_threshold:
                 assigned_category = concepts[top_match_idx]
             else:
                 assigned_category = "unclassified"
                 
-            origin_type = "Built-In Sample" if asset["data_source"] == "url" else "External Upload"
-            
             output_buckets[assigned_category].append({
                 "name": name,
                 "frame": parsed_visual_matrix,
@@ -174,21 +186,23 @@ if aggregated_media_queue and concepts:
             })
             st.success(f"⚡ Mapped **{name}** ({origin_type.upper()}) -> **[{assigned_category.upper()}]**")
         else:
-            st.error(f"⚠️ Formatting error parsing input streams for file: {name}")
-
+            st.error(f"⚠️ Formatting error parsing input stream for: {name}")
     # ========================================================
-    # WEB UI RENDERING GRID (FIXED FOR UNGROUPED ITEMS)
+    # RENDER WEB UI GRID
     # ========================================================
     st.write("---")
     st.subheader("📂 Dynamic Virtual Output Folders")
     
-    # Loop over all buckets inside output_buckets rather than just user concepts
+    # Loop over all available buckets so 'unclassified' renders safely
     for group_title, contents_list in output_buckets.items():
         if contents_list:
-            # Highlight unclassified items cleanly for user clarity
-            display_title = f"⚠️ {group_title.upper()} / UNGROUPED" if group_title == "unclassified" else f"📁 {group_title.upper()}"
-            
-            with st.expander(f"{display_title} ({len(contents_list)} items grouped)", expanded=True):
+            # Label folder gracefully if it contains the ungrouped lower-threshold items
+            if group_title == "unclassified":
+                folder_label = "⚠️ UNCLASSIFIED / UNGROUPED"
+            else:
+                folder_label = f"📁 {group_title.upper()}"
+                
+            with st.expander(f"{folder_label} ({len(contents_list)} items grouped)", expanded=True):
                 grid_columns = st.columns(4)
                 for index, grid_item in enumerate(contents_list):
                     with grid_columns[index % 4]:
