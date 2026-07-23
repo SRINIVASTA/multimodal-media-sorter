@@ -12,6 +12,7 @@ from sentence_transformers import SentenceTransformer
 st.set_page_config(page_title="Universal Media Organizer", layout="wide")
 st.title("📂 Free Multi-Source Unsupervised Media Organizer")
 st.write("Test with built-in downloaded cloud samples, upload external local assets, or combine both sources seamlessly.")
+
 def load_and_sync_samples():
     """Reads external samples.config file and downloads missing assets onto the server disk."""
     local_target_directory = "raw_unorganized_files"
@@ -32,12 +33,17 @@ def load_and_sync_samples():
             if line and not line.startswith("#"):  # Ignore empty lines and comments
                 try:
                     filename, url = line.split(",", 1)
-                    full_file_path = os.path.join(local_target_directory, filename.strip())
+                    
+                    # FIX: Force clean whitespace stripping to remove carriage returns
+                    filename = filename.strip()
+                    url = url.strip()
+                    
+                    full_file_path = os.path.join(local_target_directory, filename)
                     
                     # Performance Guard: Only download if it's missing from server drive
                     if not os.path.exists(full_file_path):
                         try:
-                            response = requests.get(url.strip(), timeout=15)
+                            response = requests.get(url, timeout=15)
                             if response.status_code == 200:
                                 with open(full_file_path, "wb") as file_handler:
                                     file_handler.write(response.content)
@@ -46,7 +52,7 @@ def load_and_sync_samples():
                             
                     # Add to manifest queue if file successfully exists on disk
                     if os.path.exists(full_file_path):
-                        sample_manifest.append({"name": filename.strip(), "path": full_file_path})
+                        sample_manifest.append({"name": filename, "path": full_file_path})
                 except ValueError:
                     st.warning(f"Skipping malformed config line: '{line}'")
                     
@@ -54,6 +60,7 @@ def load_and_sync_samples():
 
 # Automatically parse config and trigger setup sync on app initialization
 SAMPLE_MANIFEST = load_and_sync_samples()
+
 # Setup and cache the AI architecture 
 @st.cache_resource
 def load_clip_model():
