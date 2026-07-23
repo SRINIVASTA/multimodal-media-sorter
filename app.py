@@ -227,27 +227,58 @@ if aggregated_media_queue and concepts:
     # ========================================================
     # RENDER WEB UI GRID
     # ========================================================
+    # ========================================================
+    # 7. WEB UI RENDERING GRID WITH ZIP EXPORT ENGINE
+    # ========================================================
     st.write("---")
     st.subheader("📂 Dynamic Virtual Output Folders")
     
-    # Loop over all available buckets so 'unclassified' renders safely
-    for group_title, contents_list in output_buckets.items():
-        if contents_list:
-            # Label folder gracefully if it contains the ungrouped lower-threshold items
-            if group_title == "unclassified":
-                folder_label = "⚠️ UNCLASSIFIED / UNGROUPED"
-            else:
-                folder_label = f"📁 {group_title.upper()}"
-                
-            with st.expander(f"{folder_label} ({len(contents_list)} items grouped)", expanded=True):
-                grid_columns = st.columns(4)
-                for index, grid_item in enumerate(contents_list):
-                    with grid_columns[index % 4]:
-                        st.image(grid_item["frame"], use_container_width=True)
-                        st.caption(
-                            f"**Name:** {grid_item['name']}\n\n"
-                            f"**Source:** {grid_item['origin']}\n\n"
-                            f"**Confidence:** {grid_item['score']:.2f}"
-                        )
+    import zipfile
+    
+    # Create an in-memory buffer container to house our compressed archive matrix
+    zip_buffer = BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        # Loop over all available buckets so 'unclassified' renders safely
+        for group_title, contents_list in output_buckets.items():
+            if contents_list:
+                # Label folder gracefully if it contains the ungrouped lower-threshold items
+                if group_title == "unclassified":
+                    folder_label = "⚠️ UNCLASSIFIED / UNGROUPED"
+                else:
+                    folder_label = f"📁 {group_title.upper()}"
+                    
+                with st.expander(f"{folder_label} ({len(contents_list)} items grouped)", expanded=True):
+                    grid_columns = st.columns(4)
+                    for index, grid_item in enumerate(contents_list):
+                        with grid_columns[index % 4]:
+                            st.image(grid_item["frame"], use_container_width=True)
+                            st.caption(
+                                f"**Name:** {grid_item['name']}\n\n"
+                                f"**Source:** {grid_item['origin']}\n\n"
+                                f"**Confidence:** {grid_item['score']:.2f}"
+                            )
+                        
+                        # Compress and package images dynamically into virtual disk folders for zip export
+                        img_buf = BytesIO()
+                        grid_item["frame"].save(img_buf, format="JPEG")
+                        
+                        # Establish a clean folder structure inside the zip archive layout package
+                        archive_path = f"{group_title}/{grid_item['name']}"
+                        if not archive_path.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.mp4', '.avi', '.mov')):
+                            archive_path += ".jpg"  # Image fallback track
+                            
+                        zip_file.writestr(archive_path, img_buf.getvalue())
+
+    # Build a clean web layout button panel for download routing
+    st.write("---")
+    st.subheader("📦 Export Options")
+    st.download_button(
+        label="📥 Download Organized Media as ZIP",
+        data=zip_buffer.getvalue(),
+        file_name="organized_media_archive.zip",
+        mime="application/zip",
+        help="Click to download your sorted items neatly packaged into a single ZIP file containing separate concept folders."
+    )
 else:
     st.warning("All input queues empty. Toggle on 'Load Built-In Cloud Samples' or upload external files to start.")
