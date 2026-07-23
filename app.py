@@ -137,14 +137,16 @@ if aggregated_media_queue and concepts:
         target_bytes = None
         origin_type = "External Upload" if asset["data_source"] == "user_bytes" else "Built-In Sample"
         
+        # ========================================================
+        # UNIFIED DATA EXTRACTION (NO TEXT SHORTCUTS)
+        # ========================================================
         if asset["data_source"] == "server_disk":
-            if "cat" in name.lower(): sample_text_prompt = "a photo of a cat"
-            elif "car" in name.lower(): sample_text_prompt = "a photo of a car"
-            else: sample_text_prompt = "a photo of a dog"
-            extracted_vector = model.encode(sample_text_prompt)
             with open(asset["file_path"], "rb") as disk_file:
                 target_bytes = disk_file.read()
             parsed_visual_matrix = Image.open(BytesIO(target_bytes)).convert("RGB")
+            # Force the model to read the dummy image pixels instead of the text prompt string
+            extracted_vector = model.encode(parsed_visual_matrix)
+
         elif asset["data_source"] == "user_bytes":
             target_bytes = asset["raw_bytes"]
             if file_extension in ['.png', '.jpg', '.jpeg', '.webp']:
