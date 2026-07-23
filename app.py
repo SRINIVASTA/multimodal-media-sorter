@@ -84,6 +84,7 @@ def extract_video_frame(file_bytes, ext):
     if success:
         return Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     return None
+    
 # 4. Sidebar Controls and Media Aggregation
 st.sidebar.header("🕹️ Control Dashboard")
 raw_concepts = st.sidebar.text_input("Target Grouping Keywords:", "cat, dog, car, nature")
@@ -133,6 +134,7 @@ if aggregated_media_queue and concepts:
             
         parsed_visual_matrix = None
         extracted_vector = None
+        target_bytes = None
         origin_type = "External Upload" if asset["data_source"] == "user_bytes" else "Built-In Sample"
         
         if asset["data_source"] == "server_disk":
@@ -141,7 +143,8 @@ if aggregated_media_queue and concepts:
             else: sample_text_prompt = "a photo of a dog"
             extracted_vector = model.encode(sample_text_prompt)
             with open(asset["file_path"], "rb") as disk_file:
-                parsed_visual_matrix = Image.open(BytesIO(disk_file.read())).convert("RGB")
+                target_bytes = disk_file.read()
+            parsed_visual_matrix = Image.open(BytesIO(target_bytes)).convert("RGB")
         elif asset["data_source"] == "user_bytes":
             target_bytes = asset["raw_bytes"]
             if file_extension in ['.png', '.jpg', '.jpeg', '.webp']:
@@ -152,7 +155,7 @@ if aggregated_media_queue and concepts:
             if parsed_visual_matrix is not None:
                 extracted_vector = model.encode(parsed_visual_matrix)
 
-        if extracted_vector is not None and parsed_visual_matrix is not None:
+        if extracted_vector is not None and parsed_visual_matrix is not None and target_bytes is not None:
             extracted_vector = extracted_vector / np.linalg.norm(extracted_vector)
             match_scores = np.dot(concept_embeddings, extracted_vector)
             top_match_idx = np.argmax(match_scores)
@@ -162,7 +165,11 @@ if aggregated_media_queue and concepts:
             else: assigned_category = "unclassified"
                 
             output_buckets[assigned_category].append({
-                "name": name, "frame": parsed_visual_matrix, "score": max_confidence_score, "origin": origin_type
+                "name": name, 
+                "frame": parsed_visual_matrix, 
+                "score": max_confidence_score, 
+                "origin": origin_type,
+                "raw_file_bytes": target_bytes # CRITICAL FIX: Retain original binary data
             })
             st.success(f"⚡ Mapped **{name}** ({origin_type.upper()}) -> **[{assigned_category.upper()}]**")
         else:
@@ -184,12 +191,9 @@ if aggregated_media_queue and concepts:
                             st.image(grid_item["frame"], use_container_width=True)
                             st.caption(f"**Name:** {grid_item['name']}\n\n**Source:** {grid_item['origin']}\n\n**Confidence:** {grid_item['score']:.2f}")
                         
-                        img_buf = BytesIO()
-                        grid_item["frame"].save(img_buf, format="JPEG")
+                        # CRITICAL FIX: Stream original healthy bytes into zip, not corrupted string text layouts
                         archive_path = f"{group_title}/{grid_item['name']}"
-                        if not archive_path.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.mp4', '.avi', '.mov')):
-                            archive_path += ".jpg"
-                        zip_file.writestr(archive_path, img_buf.getvalue())
+                        zip_file.writestr(archive_path, grid_item["raw_file_bytes"])
 
     # 7. Dynamic Plotly Horizontal Bar Visualizations
     st.write("---")
