@@ -21,7 +21,7 @@ def load_and_sync_samples():
     config_file = "samples.config"
     sample_manifest = []
     
-    # 1. VISUAL CHECK: See if the file exists on the server
+    # Check if the configuration file exists
     if not os.path.exists(config_file):
         st.sidebar.error(f"❌ File Not Found: '{config_file}' is missing from the server root directory.")
         return []
@@ -43,7 +43,12 @@ def load_and_sync_samples():
                     # Try downloading the image file
                     if not os.path.exists(full_file_path):
                         try:
-                            response = requests.get(url, timeout=15)
+                            # FIX: Add User-Agent headers to completely bypass the 403 Forbidden blocking
+                            browser_headers = {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                            }
+                            response = requests.get(url, headers=browser_headers, timeout=15)
+                            
                             if response.status_code == 200:
                                 with open(full_file_path, "wb") as file_handler:
                                     file_handler.write(response.content)
