@@ -21,40 +21,41 @@ def load_and_sync_samples():
     config_file = "samples.config"
     sample_manifest = []
     
-    # Check if the configuration file exists
+    # 1. VISUAL CHECK: See if the file exists on the server
     if not os.path.exists(config_file):
-        st.error(f"Missing configuration file: '{config_file}' in repository root.")
+        st.sidebar.error(f"❌ File Not Found: '{config_file}' is missing from the server root directory.")
         return []
         
+    st.sidebar.success(f"📂 Found '{config_file}' file on server!")
+    
     # Read lines and download assets dynamically
     with open(config_file, "r") as f:
-        for line in f:
+        for idx, line in enumerate(f):
             line = line.strip()
-            if line and not line.startswith("#"):  # Ignore empty lines and comments
+            if line and not line.startswith("#"):
                 try:
                     filename, url = line.split(",", 1)
-                    
-                    # FIX: Force clean whitespace stripping to remove carriage returns
                     filename = filename.strip()
                     url = url.strip()
                     
                     full_file_path = os.path.join(local_target_directory, filename)
                     
-                    # Performance Guard: Only download if it's missing from server drive
+                    # Try downloading the image file
                     if not os.path.exists(full_file_path):
                         try:
                             response = requests.get(url, timeout=15)
                             if response.status_code == 200:
                                 with open(full_file_path, "wb") as file_handler:
                                     file_handler.write(response.content)
+                            else:
+                                st.sidebar.error(f"❌ Web Error on line {idx+1}: Received code {response.status_code} for {filename}")
                         except Exception as download_error:
-                            print(f"Failed streaming {filename}: {download_error}")
+                            st.sidebar.error(f"❌ Connection Error on line {idx+1}: {download_error}")
                             
-                    # Add to manifest queue if file successfully exists on disk
                     if os.path.exists(full_file_path):
                         sample_manifest.append({"name": filename, "path": full_file_path})
                 except ValueError:
-                    st.warning(f"Skipping malformed config line: '{line}'")
+                    st.sidebar.warning(f"⚠️ Malformed config line {idx+1}: '{line}'")
                     
     return sample_manifest
 
