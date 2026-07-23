@@ -13,13 +13,23 @@ st.set_page_config(page_title="Universal Media Organizer", layout="wide")
 st.title("📂 Free Multi-Source Unsupervised Media Organizer")
 st.write("Test with built-in downloaded cloud samples, upload external local assets, or combine both sources seamlessly.")
 
+import shutil  # Added to force-clear server memory corruption
+
 def load_and_sync_samples():
-    """Reads external samples.config file and downloads missing assets onto the server disk."""
+    """Wipes out any old cached corruptions and downloads fresh assets onto the server disk."""
     local_target_directory = "raw_unorganized_files"
-    os.makedirs(local_target_directory, exist_ok=True)
-    
     config_file = "samples.config"
     sample_manifest = []
+    
+    # 1. FORCE-CLEAR CACHE: Wipe out any old corrupted folders from past runs
+    if os.path.exists(local_target_directory):
+        try:
+            shutil.rmtree(local_target_directory)
+        except Exception as e:
+            print(f"Directory clear warning: {e}")
+            
+    # Recreate a clean folder structure on the server
+    os.makedirs(local_target_directory, exist_ok=True)
     
     # Check if the configuration file exists
     if not os.path.exists(config_file):
@@ -28,7 +38,7 @@ def load_and_sync_samples():
         
     st.sidebar.success(f"📂 Found '{config_file}' file on server!")
     
-    # Read lines and download assets dynamically
+    # 2. Read lines and download fresh assets with web browser emulation
     with open(config_file, "r") as f:
         for idx, line in enumerate(f):
             line = line.strip()
@@ -40,25 +50,22 @@ def load_and_sync_samples():
                     
                     full_file_path = os.path.join(local_target_directory, filename)
                     
-                    # FIX: Force download if the file is missing OR if it is an empty 0-byte corrupt file
-                    should_download = not os.path.exists(full_file_path) or os.path.getsize(full_file_path) == 0
-                    
-                    if should_download:
-                        try:
-                            browser_headers = {
-                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                            }
-                            response = requests.get(url, headers=browser_headers, timeout=15)
+                    try:
+                        # Emulate a genuine desktop browser request to completely bypass 403 locks
+                        browser_headers = {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        }
+                        response = requests.get(url, headers=browser_headers, timeout=15)
+                        
+                        if response.status_code == 200:
+                            with open(full_file_path, "wb") as file_handler:
+                                file_handler.write(response.content)
+                        else:
+                            st.sidebar.error(f"❌ Web Error on line {idx+1}: Received code {response.status_code} for {filename}")
+                    except Exception as download_error:
+                        st.sidebar.error(f"❌ Connection Error on line {idx+1}: {download_error}")
                             
-                            if response.status_code == 200:
-                                with open(full_file_path, "wb") as file_handler:
-                                    file_handler.write(response.content)
-                            else:
-                                st.sidebar.error(f"❌ Web Error on line {idx+1}: Received code {response.status_code} for {filename}")
-                        except Exception as download_error:
-                            st.sidebar.error(f"❌ Connection Error on line {idx+1}: {download_error}")
-                            
-                    # Only append to manifest if the file exists and is healthy (> 0 bytes)
+                    # Track files that are fully intact and functional
                     if os.path.exists(full_file_path) and os.path.getsize(full_file_path) > 0:
                         sample_manifest.append({"name": filename, "path": full_file_path})
                 except ValueError:
