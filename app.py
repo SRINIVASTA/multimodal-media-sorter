@@ -134,6 +134,7 @@ st.sidebar.write("---")
 st.sidebar.subheader("📦 Data Source Options")
 
 use_samples = st.sidebar.checkbox("Load Built-In Cloud Samples", value=True)
+
 aggregated_media_queue = []
 
 if use_samples and SAMPLE_MANIFEST:
@@ -154,28 +155,37 @@ if external_files:
             "name": f.name, "data_source": "user_bytes", "raw_bytes": f.read()
         })
 
-# 5. Core Multimodal Processing AI Loop
+# ========================================================
+# 5. CORE MULTIMODAL PROCESSING AI LOOP (HIGH-PRECISION ANCHORS)
+# ========================================================
 if aggregated_media_queue and concepts:
     st.write("---")
     st.subheader("⚙️ Unified AI Processing Lane")
     
-    concept_embeddings = model.encode([f"a photo of a {c}" for c in concepts])
+    # FIX: Generate multi-context description matrices for each target keyword
+    concept_list_embeddings = []
+    for c in concepts:
+        # Create a pool of varied context prompts to capture diverse animal breeds and angles
+        prompt_templates = [
+            f"a photo of a {c}",
+            f"a close up photograph of a {c}",
+            f"a domestic pet {c}",
+            f"a beautiful clean {c}",
+            f"the silhouette of a clear {c}"
+        ]
+        # Encode all templates and take their mathematical average (mean vector pooling)
+        template_vectors = model.encode(prompt_templates)
+        averaged_concept_vector = np.mean(template_vectors, axis=0)
+        concept_list_embeddings.append(averaged_concept_vector)
+        
+    # Stack and normalize the finalized high-precision target anchors
+    concept_embeddings = np.array(concept_list_embeddings)
     concept_embeddings = concept_embeddings / np.linalg.norm(concept_embeddings, axis=1, keepdims=True)
     
+    # Initialize categorization buckets
     output_buckets = {c: [] for c in concepts}
     output_buckets["unclassified"] = []
-    
-    for asset in aggregated_media_queue:
-        name = asset["name"]
-        _, file_extension = os.path.splitext(name.lower())
-        if not file_extension:
-            file_extension = ".jpg"
-            
-        parsed_visual_matrix = None
-        extracted_vector = None
-        target_bytes = None
-        origin_type = "External Upload" if asset["data_source"] == "user_bytes" else "Built-In Sample"
-        
+
         # ========================================================
         # UNIFIED DATA EXTRACTION (NO TEXT SHORTCUTS)
         # ========================================================
