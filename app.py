@@ -40,10 +40,11 @@ def load_and_sync_samples():
                     
                     full_file_path = os.path.join(local_target_directory, filename)
                     
-                    # Try downloading the image file
-                    if not os.path.exists(full_file_path):
+                    # FIX: Force download if the file is missing OR if it is an empty 0-byte corrupt file
+                    should_download = not os.path.exists(full_file_path) or os.path.getsize(full_file_path) == 0
+                    
+                    if should_download:
                         try:
-                            # FIX: Add User-Agent headers to completely bypass the 403 Forbidden blocking
                             browser_headers = {
                                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                             }
@@ -57,7 +58,8 @@ def load_and_sync_samples():
                         except Exception as download_error:
                             st.sidebar.error(f"❌ Connection Error on line {idx+1}: {download_error}")
                             
-                    if os.path.exists(full_file_path):
+                    # Only append to manifest if the file exists and is healthy (> 0 bytes)
+                    if os.path.exists(full_file_path) and os.path.getsize(full_file_path) > 0:
                         sample_manifest.append({"name": filename, "path": full_file_path})
                 except ValueError:
                     st.sidebar.warning(f"⚠️ Malformed config line {idx+1}: '{line}'")
