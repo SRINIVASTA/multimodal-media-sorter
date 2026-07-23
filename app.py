@@ -128,7 +128,7 @@ def extract_video_frame(file_bytes, ext):
 st.sidebar.header("🕹️ Control Dashboard")
 raw_concepts = st.sidebar.text_input("Target Grouping Keywords:", "cat, dog, car, nature")
 concepts = [c.strip().lower() for c in raw_concepts.split(",") if c.strip()]
-confidence_threshold = st.sidebar.slider("AI Confidence Cutoff Threshold", 0.0, 1.0, 0.26) # Tuned default to separate dummies
+confidence_threshold = st.sidebar.slider("AI Confidence Cutoff Threshold", 0.0, 1.0, 0.26)
 
 st.sidebar.write("---")
 st.sidebar.subheader("📦 Data Source Options")
@@ -179,6 +179,9 @@ if aggregated_media_queue and concepts:
     output_buckets = {c: [] for c in concepts}
     output_buckets["unclassified"] = []
     
+    # Keep a flat list of all items with their normalized vectors for the search engine feature
+    all_processed_items = []
+    
     for asset in aggregated_media_queue:
         name = asset["name"]
         _, file_extension = os.path.splitext(name.lower())
@@ -190,7 +193,6 @@ if aggregated_media_queue and concepts:
         target_bytes = None
         origin_type = "External Upload" if asset["data_source"] == "user_bytes" else "Built-In Sample"
         
-        # Cleaned spacing architecture inside the loop logic parameters
         if asset["data_source"] == "server_disk":
             with open(asset["file_path"], "rb") as disk_file:
                 target_bytes = disk_file.read()
@@ -209,8 +211,9 @@ if aggregated_media_queue and concepts:
                 extracted_vector = model.encode(parsed_visual_matrix)
 
         if extracted_vector is not None and parsed_visual_matrix is not None and target_bytes is not None:
-            extracted_vector = extracted_vector / np.linalg.norm(extracted_vector)
-            match_scores = np.dot(concept_embeddings, extracted_vector)
+            # Normalize vector weights to unit scale
+            normalized_vector = extracted_vector / np.linalg.norm(extracted_vector)
+            match_scores = np.dot(concept_embeddings, normalized_vector)
             top_match_idx = np.argmax(match_scores)
             max_confidence_score = match_scores[top_match_idx]
             
@@ -219,13 +222,17 @@ if aggregated_media_queue and concepts:
             else:
                 assigned_category = "unclassified"
                 
-            output_buckets[assigned_category].append({
+            item_payload = {
                 "name": name, 
                 "frame": parsed_visual_matrix, 
                 "score": max_confidence_score, 
                 "origin": origin_type,
-                "raw_file_bytes": target_bytes
-            })
+                "raw_file_bytes": target_bytes,
+                "vector": normalized_vector
+            }
+            
+            output_buckets[assigned_category].append(item_payload)
+            all_processed_items.append(item_payload)
             st.success(f"⚡ Mapped **{name}** ({origin_type.upper()}) -> **[{assigned_category.upper()}]**")
         else:
             st.error(f"⚠️ Formatting error parsing input stream for: {name}")
@@ -248,6 +255,34 @@ if aggregated_media_queue and concepts:
                         
                         archive_path = f"{group_title}/{grid_item['name']}"
                         zip_file.writestr(archive_path, grid_item["raw_file_bytes"])
+
+    # ========================================================
+    # NEW: INTERACTIVE SEMANTIC SEARCH BOX
+    # ========================================================
+    st.write("---")
+    st.subheader("🔍 Conceptual Media Search Engine")
+    search_query = st.text_input("Type an unstructured sentence to query your media pool instantly:", placeholder="e.g., a pet playing outside or a fast vehicle")
+    
+    if search_query:
+        # Encode the search query sentence into vector space coordinates
+        query_vector = model.encode(search_query)
+        query_vector = query_vector / np.linalg.norm(query_vector)
+        
+        # Calculate similarity scores for all processed files
+        search_results = []
+        for item in all_processed_items:
+            similarity = np.dot(item["vector"], query_vector)
+            search_results.append((similarity, item))
+            
+        # Sort results from highest match to lowest match
+        search_results.sort(key=lambda x: x[0], reverse=True)
+        
+        st.write(f"Showing best matching files for: *\"{search_query}\"*")
+        search_cols = st.columns(4)
+        for idx, (sim_score, item) in enumerate(search_results[:4]): # Render top 4 best matches
+            with search_cols[idx % 4]:
+                st.image(item["frame"], use_container_width=True)
+                st.caption(f"**{item['name']}**\n\nSemantic Relevance: {sim_score:.2f}")
 
     # 7. Dynamic Plotly Horizontal Bar Visualizations
     st.write("---")
