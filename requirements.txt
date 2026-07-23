@@ -1,0 +1,7 @@
+streamlit
+sentence-transformers
+pillow
+opencv-python-headless
+numpy
+scikit-learn
+requests
