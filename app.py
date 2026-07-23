@@ -94,20 +94,34 @@ def load_clip_model():
 model = load_clip_model()
 
 def extract_video_frame(file_bytes, ext):
-    """Slices open a video data stream and returns the core middle frame."""
+    """Slices open a video data stream and returns a combined, averaged image from multiple points."""
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_file:
         temp_file.write(file_bytes)
         temp_path = temp_file.name
         
     cap = cv2.VideoCapture(temp_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    cap.set(cv2.CAP_PROP_POS_FRAMES, total_frames // 2)
-    success, frame = cap.read()
+    
+    # Define three distinct time points to capture action segments
+    frame_checkpoints = [total_frames // 4, total_frames // 2, (3 * total_frames) // 4]
+    captured_frames = []
+    
+    for pos in frame_checkpoints:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, pos)
+        success, frame = cap.read()
+        if success:
+            # Convert OpenCV BGR array to standard PIL RGB format
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            captured_frames.append(rgb_frame)
+            
     cap.release()
     os.unlink(temp_path)
     
-    if success:
-        return Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    if len(captured_frames) > 0:
+        # Take the mathematical pixel mean across all captured frames to create a clean visual summary
+        averaged_matrix = np.mean(captured_frames, axis=0).astype(np.uint8)
+        return Image.fromarray(averaged_matrix)
+        
     return None
     
 # 4. Sidebar Controls and Media Aggregation
