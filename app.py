@@ -128,13 +128,12 @@ def extract_video_frame(file_bytes, ext):
 st.sidebar.header("🕹️ Control Dashboard")
 raw_concepts = st.sidebar.text_input("Target Grouping Keywords:", "cat, dog, car, nature")
 concepts = [c.strip().lower() for c in raw_concepts.split(",") if c.strip()]
-confidence_threshold = st.sidebar.slider("AI Confidence Cutoff Threshold", 0.0, 1.0, 0.18)
+confidence_threshold = st.sidebar.slider("AI Confidence Cutoff Threshold", 0.0, 1.0, 0.26) # Tuned default to separate dummies
 
 st.sidebar.write("---")
 st.sidebar.subheader("📦 Data Source Options")
 
 use_samples = st.sidebar.checkbox("Load Built-In Cloud Samples", value=True)
-
 aggregated_media_queue = []
 
 if use_samples and SAMPLE_MANIFEST:
@@ -155,17 +154,14 @@ if external_files:
             "name": f.name, "data_source": "user_bytes", "raw_bytes": f.read()
         })
 
-# ========================================================
-# 5. CORE MULTIMODAL PROCESSING AI LOOP (HIGH-PRECISION ANCHORS)
-# ========================================================
+# 5. Core Multimodal Processing AI Loop (With Multi-Prompt Realignment Fixes)
 if aggregated_media_queue and concepts:
     st.write("---")
     st.subheader("⚙️ Unified AI Processing Lane")
     
-    # FIX: Generate multi-context description matrices for each target keyword
+    # Generate multi-context description matrices for each target keyword
     concept_list_embeddings = []
     for c in concepts:
-        # Create a pool of varied context prompts to capture diverse animal breeds and angles
         prompt_templates = [
             f"a photo of a {c}",
             f"a close up photograph of a {c}",
@@ -173,34 +169,40 @@ if aggregated_media_queue and concepts:
             f"a beautiful clean {c}",
             f"the silhouette of a clear {c}"
         ]
-        # Encode all templates and take their mathematical average (mean vector pooling)
         template_vectors = model.encode(prompt_templates)
         averaged_concept_vector = np.mean(template_vectors, axis=0)
         concept_list_embeddings.append(averaged_concept_vector)
         
-    # Stack and normalize the finalized high-precision target anchors
     concept_embeddings = np.array(concept_list_embeddings)
     concept_embeddings = concept_embeddings / np.linalg.norm(concept_embeddings, axis=1, keepdims=True)
     
-    # Initialize categorization buckets
     output_buckets = {c: [] for c in concepts}
     output_buckets["unclassified"] = []
-
-        # ========================================================
-        # UNIFIED DATA EXTRACTION (NO TEXT SHORTCUTS)
-        # ========================================================
+    
+    for asset in aggregated_media_queue:
+        name = asset["name"]
+        _, file_extension = os.path.splitext(name.lower())
+        if not file_extension:
+            file_extension = ".jpg"
+            
+        parsed_visual_matrix = None
+        extracted_vector = None
+        target_bytes = None
+        origin_type = "External Upload" if asset["data_source"] == "user_bytes" else "Built-In Sample"
+        
+        # Cleaned spacing architecture inside the loop logic parameters
         if asset["data_source"] == "server_disk":
             with open(asset["file_path"], "rb") as disk_file:
                 target_bytes = disk_file.read()
             parsed_visual_matrix = Image.open(BytesIO(target_bytes)).convert("RGB")
-            # Force the model to read the dummy image pixels instead of the text prompt string
             extracted_vector = model.encode(parsed_visual_matrix)
-
         elif asset["data_source"] == "user_bytes":
             target_bytes = asset["raw_bytes"]
             if file_extension in ['.png', '.jpg', '.jpeg', '.webp']:
-                try: parsed_visual_matrix = Image.open(BytesIO(target_bytes)).convert("RGB")
-                except: pass
+                try:
+                    parsed_visual_matrix = Image.open(BytesIO(target_bytes)).convert("RGB")
+                except:
+                    pass
             elif file_extension in ['.mp4', '.avi', '.mov']:
                 parsed_visual_matrix = extract_video_frame(target_bytes, file_extension)
             if parsed_visual_matrix is not None:
@@ -212,15 +214,17 @@ if aggregated_media_queue and concepts:
             top_match_idx = np.argmax(match_scores)
             max_confidence_score = match_scores[top_match_idx]
             
-            if max_confidence_score >= confidence_threshold: assigned_category = concepts[top_match_idx]
-            else: assigned_category = "unclassified"
+            if max_confidence_score >= confidence_threshold:
+                assigned_category = concepts[top_match_idx]
+            else:
+                assigned_category = "unclassified"
                 
             output_buckets[assigned_category].append({
                 "name": name, 
                 "frame": parsed_visual_matrix, 
                 "score": max_confidence_score, 
                 "origin": origin_type,
-                "raw_file_bytes": target_bytes # CRITICAL FIX: Retain original binary data
+                "raw_file_bytes": target_bytes
             })
             st.success(f"⚡ Mapped **{name}** ({origin_type.upper()}) -> **[{assigned_category.upper()}]**")
         else:
@@ -242,7 +246,6 @@ if aggregated_media_queue and concepts:
                             st.image(grid_item["frame"], use_container_width=True)
                             st.caption(f"**Name:** {grid_item['name']}\n\n**Source:** {grid_item['origin']}\n\n**Confidence:** {grid_item['score']:.2f}")
                         
-                        # CRITICAL FIX: Stream original healthy bytes into zip, not corrupted string text layouts
                         archive_path = f"{group_title}/{grid_item['name']}"
                         zip_file.writestr(archive_path, grid_item["raw_file_bytes"])
 
