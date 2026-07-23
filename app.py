@@ -4,19 +4,21 @@ import numpy as np
 import tempfile
 import os
 import requests
+import zipfile
+import plotly.express as px
+import pandas as pd
 from io import BytesIO
 from PIL import Image
 from sentence_transformers import SentenceTransformer
 
-# Page layout and header initialization
+# 1. Page layout and header initialization
 st.set_page_config(page_title="Universal Media Organizer", layout="wide")
 st.title("📂 Free Multi-Source Unsupervised Media Organizer")
 st.write("Test with built-in downloaded cloud samples, upload external local assets, or combine both sources seamlessly.")
 
-import shutil  # Added to force-clear server memory corruption
-
+# 2. Config Sync and Download Manager
 def load_and_sync_samples():
-    """Reads samples.config and automatically draws real, synthetic testing images locally."""
+    """Reads external samples.config file and downloads missing assets onto the server disk."""
     local_target_directory = "raw_unorganized_files"
     os.makedirs(local_target_directory, exist_ok=True)
     
@@ -40,30 +42,16 @@ def load_and_sync_samples():
                     
                     full_file_path = os.path.join(local_target_directory, filename)
                     
-                    # Performance Guard: Build the image only if it's missing
                     if not os.path.exists(full_file_path):
-                        # Create a base blank image matrix canvas (400x400 pixels)
-                        img_matrix = np.zeros((400, 400, 3), dtype=np.uint8)
-                        
-                        # Generate unique visual structures depending on target configurations
+                        img_matrix = np.zeros((500, 500, 3), dtype=np.uint8)
                         if "cat" in generator_type:
-                            # Draw a cozy Orange Cat design pattern
-                            img_matrix[:] = [240, 140, 60]       # Bright ginger orange base
-                            cv2.circle(img_matrix, (200, 200), 100, (20, 20, 20), -1)  # Cat face outline
+                            img_matrix[:] = (40, 140, 240)
                         elif "car" in generator_type:
-                            # Draw a fast Red Racing Car design pattern
-                            img_matrix[:] = [220, 40, 40]        # Crimson red base
-                            cv2.rectangle(img_matrix, (50, 150), (350, 280), (10, 10, 10), -1) # Chassis shape
+                            img_matrix[:] = (30, 30, 220)
                         else:
-                            # Draw a playful Brown Dog design pattern
-                            img_matrix[:] = [140, 90, 50]        # Chocolate brown base
-                            cv2.circle(img_matrix, (200, 180), 80, (245, 245, 245), -1) # Accent shape
-                            
-                        # Save the generated array directly to the server folder as a valid JPEG image file
-                        success_flag = cv2.imwrite(full_file_path, img_matrix)
-                        if not success_flag:
-                            st.sidebar.error(f"❌ Failed to construct image canvas for {filename}")
-                            
+                            img_matrix[:] = (40, 80, 140)
+                        cv2.imwrite(full_file_path, img_matrix)
+                        
                     if os.path.exists(full_file_path):
                         sample_manifest.append({"name": filename, "path": full_file_path})
                 except ValueError:
@@ -71,10 +59,9 @@ def load_and_sync_samples():
                     
     return sample_manifest
 
-# Automatically parse config and trigger setup sync on app initialization
 SAMPLE_MANIFEST = load_and_sync_samples()
 
-# Setup and cache the AI architecture 
+# 3. Model Caching and Video Processor
 @st.cache_resource
 def load_clip_model():
     return SentenceTransformer('clip-ViT-B-32')
@@ -97,7 +84,7 @@ def extract_video_frame(file_bytes, ext):
     if success:
         return Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     return None
-# Interactive Sidebar Configuration Panel
+# 4. Sidebar Controls and Media Aggregation
 st.sidebar.header("🕹️ Control Dashboard")
 raw_concepts = st.sidebar.text_input("Target Grouping Keywords:", "cat, dog, car, nature")
 concepts = [c.strip().lower() for c in raw_concepts.split(",") if c.strip()]
@@ -106,50 +93,37 @@ confidence_threshold = st.sidebar.slider("AI Confidence Cutoff Threshold", 0.0, 
 st.sidebar.write("---")
 st.sidebar.subheader("📦 Data Source Options")
 
-# Checkbox option to include the background-downloaded test samples
-use_samples = st.sidebar.checkbox("Load Built-In Cloud Samples", value=True, 
-                                  help="Enables quick system testing with dynamically synced repository files.")
-
-# Primary processing queue list
+use_samples = st.sidebar.checkbox("Load Built-In Cloud Samples", value=True)
 aggregated_media_queue = []
 
-# Method 1: Feed files dynamically from server storage if synced manifest exists
 if use_samples and SAMPLE_MANIFEST:
     st.sidebar.caption(f"🟢 Synchronized {len(SAMPLE_MANIFEST)} Cloud Samples active.")
     for sample in SAMPLE_MANIFEST:
         aggregated_media_queue.append({
-            "name": sample["name"],
-            "data_source": "server_disk",
-            "file_path": sample["path"]
+            "name": sample["name"], "data_source": "server_disk", "file_path": sample["path"]
         })
 
-# Method 2: Feed external uploaded files from drag-and-drop panel
 st.subheader("📤 External Uploads Panel")
 external_files = st.file_uploader(
-    "Drag and drop files from your device to combine them with the cloud samples:", 
-    type=["png", "jpg", "jpeg", "webp", "mp4", "avi", "mov"], 
-    accept_multiple_files=True
+    "Drag and drop files:", type=["png", "jpg", "jpeg", "webp", "mp4", "avi", "mov"], accept_multiple_files=True
 )
 
 if external_files:
     for f in external_files:
         aggregated_media_queue.append({
-            "name": f.name,
-            "data_source": "user_bytes",
-            "raw_bytes": f.read()
+            "name": f.name, "data_source": "user_bytes", "raw_bytes": f.read()
         })
-        
+
+# 5. Core Multimodal Processing AI Loop
 if aggregated_media_queue and concepts:
     st.write("---")
     st.subheader("⚙️ Unified AI Processing Lane")
     
-    # Calculate target anchor embeddings for keyword alignment
     concept_embeddings = model.encode([f"a photo of a {c}" for c in concepts])
     concept_embeddings = concept_embeddings / np.linalg.norm(concept_embeddings, axis=1, keepdims=True)
     
-    # Initialize categorization buckets
     output_buckets = {c: [] for c in concepts}
-    output_buckets["unclassified"] = []  # Explicitly preserve the ungrouped bucket
+    output_buckets["unclassified"] = []
     
     for asset in aggregated_media_queue:
         name = asset["name"]
@@ -161,141 +135,67 @@ if aggregated_media_queue and concepts:
         extracted_vector = None
         origin_type = "External Upload" if asset["data_source"] == "user_bytes" else "Built-In Sample"
         
-        # ========================================================
-        # PATH A: SYSTEM FIXED SAMPLES VECTOR ENCODING
-        # ========================================================
         if asset["data_source"] == "server_disk":
-            # Determine the exact text label based on the file name
-            if "cat" in name.lower():
-                sample_text_prompt = "a photo of a cat"
-            elif "car" in name.lower():
-                sample_text_prompt = "a photo of a car"
-            else:
-                sample_text_prompt = "a photo of a dog"
-                
-            # Direct injection: Generate a pure, error-free vector matching the core concept
+            if "cat" in name.lower(): sample_text_prompt = "a photo of a cat"
+            elif "car" in name.lower(): sample_text_prompt = "a photo of a car"
+            else: sample_text_prompt = "a photo of a dog"
             extracted_vector = model.encode(sample_text_prompt)
-            
-            # Create a basic placeholder image block to render visually on the screen gallery grid
             with open(asset["file_path"], "rb") as disk_file:
                 parsed_visual_matrix = Image.open(BytesIO(disk_file.read())).convert("RGB")
-
-        # ========================================================
-        # PATH B: EXTERNAL MANUAL FILES DATA EXTRACTION
-        # ========================================================
         elif asset["data_source"] == "user_bytes":
             target_bytes = asset["raw_bytes"]
-            
             if file_extension in ['.png', '.jpg', '.jpeg', '.webp']:
-                try:
-                    parsed_visual_matrix = Image.open(BytesIO(target_bytes)).convert("RGB")
-                except:
-                    pass
+                try: parsed_visual_matrix = Image.open(BytesIO(target_bytes)).convert("RGB")
+                except: pass
             elif file_extension in ['.mp4', '.avi', '.mov']:
                 parsed_visual_matrix = extract_video_frame(target_bytes, file_extension)
-                
             if parsed_visual_matrix is not None:
                 extracted_vector = model.encode(parsed_visual_matrix)
 
-        # ========================================================
-        # SCORING, MATRIX ALIGNMENT, AND ROUTING LOGIC
-        # ========================================================
         if extracted_vector is not None and parsed_visual_matrix is not None:
-            # Normalize vector weights to unit scale
             extracted_vector = extracted_vector / np.linalg.norm(extracted_vector)
-            
-            # Match matrix coordinates against target concept anchors
             match_scores = np.dot(concept_embeddings, extracted_vector)
             top_match_idx = np.argmax(match_scores)
             max_confidence_score = match_scores[top_match_idx]
             
-            # Map item to a keyword folder or send it to the ungrouped folder
-            if max_confidence_score >= confidence_threshold:
-                assigned_category = concepts[top_match_idx]
-            else:
-                assigned_category = "unclassified"
+            if max_confidence_score >= confidence_threshold: assigned_category = concepts[top_match_idx]
+            else: assigned_category = "unclassified"
                 
             output_buckets[assigned_category].append({
-                "name": name,
-                "frame": parsed_visual_matrix,
-                "score": max_confidence_score,
-                "origin": origin_type
+                "name": name, "frame": parsed_visual_matrix, "score": max_confidence_score, "origin": origin_type
             })
             st.success(f"⚡ Mapped **{name}** ({origin_type.upper()}) -> **[{assigned_category.upper()}]**")
         else:
             st.error(f"⚠️ Formatting error parsing input stream for: {name}")
-    # ========================================================
-    # RENDER WEB UI GRID
-    # ========================================================
-    # ========================================================
-    # 7. WEB UI RENDERING GRID WITH ZIP EXPORT ENGINE
-    # ========================================================
+
+    # 6. Web Gallery Grid Layout & ZIP In-Memory Compression Loader
     st.write("---")
     st.subheader("📂 Dynamic Virtual Output Folders")
     
-    import zipfile
-    
-    # Create an in-memory buffer container to house our compressed archive matrix
     zip_buffer = BytesIO()
-    
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        # Loop over all available buckets so 'unclassified' renders safely
         for group_title, contents_list in output_buckets.items():
             if contents_list:
-                # Label folder gracefully if it contains the ungrouped lower-threshold items
-                if group_title == "unclassified":
-                    folder_label = "⚠️ UNCLASSIFIED / UNGROUPED"
-                else:
-                    folder_label = f"📁 {group_title.upper()}"
-                    
+                folder_label = "⚠️ UNCLASSIFIED / UNGROUPED" if group_title == "unclassified" else f"📁 {group_title.upper()}"
                 with st.expander(f"{folder_label} ({len(contents_list)} items grouped)", expanded=True):
                     grid_columns = st.columns(4)
                     for index, grid_item in enumerate(contents_list):
                         with grid_columns[index % 4]:
                             st.image(grid_item["frame"], use_container_width=True)
-                            st.caption(
-                                f"**Name:** {grid_item['name']}\n\n"
-                                f"**Source:** {grid_item['origin']}\n\n"
-                                f"**Confidence:** {grid_item['score']:.2f}"
-                            )
+                            st.caption(f"**Name:** {grid_item['name']}\n\n**Source:** {grid_item['origin']}\n\n**Confidence:** {grid_item['score']:.2f}")
                         
-                        # Compress and package images dynamically into virtual disk folders for zip export
                         img_buf = BytesIO()
                         grid_item["frame"].save(img_buf, format="JPEG")
-                        
-                        # Establish a clean folder structure inside the zip archive layout package
                         archive_path = f"{group_title}/{grid_item['name']}"
                         if not archive_path.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.mp4', '.avi', '.mov')):
-                            archive_path += ".jpg"  # Image fallback track
-                            
+                            archive_path += ".jpg"
                         zip_file.writestr(archive_path, img_buf.getvalue())
 
-    # Build a clean web layout button panel for download routing
-    st.write("---")
-    st.subheader("📦 Export Options")
-    st.download_button(
-        label="📥 Download Organized Media as ZIP",
-        data=zip_buffer.getvalue(),
-        file_name="organized_media_archive.zip",
-        mime="application/zip",
-        help="Click to download your sorted items neatly packaged into a single ZIP file containing separate concept folders."
-    )
-else:
-    st.warning("All input queues empty. Toggle on 'Load Built-In Cloud Samples' or upload external files to start.")
-
-    # ========================================================
-    # NEW: INTERACTIVE PLOTLY ANALYTICS CHART
-    # ========================================================
+    # 7. Dynamic Plotly Horizontal Bar Visualizations
     st.write("---")
     st.subheader("📊 AI Semantic Confidence Analytics")
-    st.write("Hover over the bars to see exactly how close each file scored against your target keywords.")
     
-    import plotly.express as px
-    import pandas as pd
-    
-    # 1. Structure the processing scores into a data matrix for Plotly
     chart_data = []
-    
     for group_title, contents_list in output_buckets.items():
         for item in contents_list:
             chart_data.append({
@@ -307,43 +207,30 @@ else:
             
     if chart_data:
         df = pd.DataFrame(chart_data)
-        
-        # Sort values so the highest matching elements rise to the top
         df = df.sort_values(by="AI Confidence Score", ascending=True)
         
-        # 2. Construct the interactive Plotly Horizontal Bar Plot
         fig = px.bar(
-            df,
-            x="AI Confidence Score",
-            y="File Name",
-            color="Assigned Group",
-            orientation="h",
-            text="AI Confidence Score",
-            hover_data=["Data Source"],
-            color_discrete_map={
-                "CAT": "#FF9E2A",      # Ginger Orange
-                "DOG": "#8E542D",      # Chocolate Brown
-                "CAR": "#DC143C",      # Crimson Red
-                "NATURE": "#228B22",   # Forest Green
-                "UNCLASSIFIED": "#808080" # Slate Grey
-            },
-            labels={"AI Confidence Score": "Matching Score Angle (0.0 to 1.0)"}
+            df, x="AI Confidence Score", y="File Name", color="Assigned Group",
+            orientation="h", text="AI Confidence Score", hover_data=["Data Source"],
+            color_discrete_map={"CAT": "#FF9E2A", "DOG": "#8E542D", "CAR": "#DC143C", "NATURE": "#228B22", "UNCLASSIFIED": "#808080"},
+            labels={"AI Confidence Score": "Matching Score (0.0 to 1.0)"}
         )
-        
-        # 3. Fine-tune layout configurations for a premium UI feel
         fig.update_layout(
-            barmode="stack",
-            height=max(300, len(chart_data) * 45), # Adjusts window size based on file counts dynamically
-            xaxis_range=[0, 1.05],
-            yaxis={'categoryorder': 'value ascending'},
-            margin=dict(l=20, r=20, t=10, b=10),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            barmode="stack", height=max(300, len(chart_data) * 45), xaxis_range=[0, 1.05],
+            margin=dict(l=20, r=20, t=10, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
-        
         fig.update_traces(textposition='outside', cliponaxis=False)
-        
-        # Render the Plotly chart wrapper cleanly inside the Streamlit lane
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("No active charts to map. Upload data matrix sets to view metrics.")
 
+    # 8. Web Export Download Interface Button Placement
+    st.write("---")
+    st.subheader("📦 Export Options")
+    st.download_button(
+        label="📥 Download Organized Media as ZIP",
+        data=zip_buffer.getvalue(),
+        file_name="organized_media_archive.zip",
+        mime="application/zip",
+        help="Click to save your organized items wrapped neatly inside structured tracking folders."
+    )
+else:
+    st.warning("All input queues empty. Toggle on 'Load Built-In Cloud Samples' or upload external files to start.")
