@@ -282,3 +282,68 @@ if aggregated_media_queue and concepts:
     )
 else:
     st.warning("All input queues empty. Toggle on 'Load Built-In Cloud Samples' or upload external files to start.")
+
+    # ========================================================
+    # NEW: INTERACTIVE PLOTLY ANALYTICS CHART
+    # ========================================================
+    st.write("---")
+    st.subheader("📊 AI Semantic Confidence Analytics")
+    st.write("Hover over the bars to see exactly how close each file scored against your target keywords.")
+    
+    import plotly.express as px
+    import pandas as pd
+    
+    # 1. Structure the processing scores into a data matrix for Plotly
+    chart_data = []
+    
+    for group_title, contents_list in output_buckets.items():
+        for item in contents_list:
+            chart_data.append({
+                "File Name": item["name"],
+                "Assigned Group": group_title.upper(),
+                "AI Confidence Score": round(float(item["score"]), 3),
+                "Data Source": item["origin"]
+            })
+            
+    if chart_data:
+        df = pd.DataFrame(chart_data)
+        
+        # Sort values so the highest matching elements rise to the top
+        df = df.sort_values(by="AI Confidence Score", ascending=True)
+        
+        # 2. Construct the interactive Plotly Horizontal Bar Plot
+        fig = px.bar(
+            df,
+            x="AI Confidence Score",
+            y="File Name",
+            color="Assigned Group",
+            orientation="h",
+            text="AI Confidence Score",
+            hover_data=["Data Source"],
+            color_discrete_map={
+                "CAT": "#FF9E2A",      # Ginger Orange
+                "DOG": "#8E542D",      # Chocolate Brown
+                "CAR": "#DC143C",      # Crimson Red
+                "NATURE": "#228B22",   # Forest Green
+                "UNCLASSIFIED": "#808080" # Slate Grey
+            },
+            labels={"AI Confidence Score": "Matching Score Angle (0.0 to 1.0)"}
+        )
+        
+        # 3. Fine-tune layout configurations for a premium UI feel
+        fig.update_layout(
+            barmode="stack",
+            height=max(300, len(chart_data) * 45), # Adjusts window size based on file counts dynamically
+            xaxis_range=[0, 1.05],
+            yaxis={'categoryorder': 'value ascending'},
+            margin=dict(l=20, r=20, t=10, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        
+        fig.update_traces(textposition='outside', cliponaxis=False)
+        
+        # Render the Plotly chart wrapper cleanly inside the Streamlit lane
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No active charts to map. Upload data matrix sets to view metrics.")
+
