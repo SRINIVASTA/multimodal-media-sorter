@@ -3,7 +3,6 @@ import cv2
 import numpy as np
 import tempfile
 import os
-import requests
 from io import BytesIO
 from PIL import Image
 from sentence_transformers import SentenceTransformer
@@ -38,15 +37,22 @@ def extract_video_frame(file_bytes, ext):
         return Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     return None
 
-def fetch_sample_bytes(url):
-    """Downloads public domain testing samples straight into temporary web RAM."""
-    try:
-        response = requests.get(url, timeout=15)
-        if response.status_code == 200:
-            return response.content
-    except Exception as e:
-        st.sidebar.error(f"Failed to fetch baseline cloud assets: {e}")
-    return None
+def fetch_sample_bytes(sample_name):
+    """Generates a clean synthetic image in-memory to prevent web link dropouts completely."""
+    if "cat" in sample_name.lower():
+        color = [210, 105, 30]   # Chocolate Brown tint
+    elif "car" in sample_name.lower():
+        color = [220, 20, 60]    # Crimson Red tint
+    elif "nature" in sample_name.lower():
+        color = [34, 139, 34]    # Forest Green tint
+    else:
+        color = [128, 128, 128]  # Slate Grey tint
+        
+    img_array = np.full((300, 300, 3), color, dtype=np.uint8)
+    image = Image.fromarray(img_array)
+    buf = BytesIO()
+    image.save(buf, format="JPEG")
+    return buf.getvalue()
 
 # 4. Interactive Sidebar Configuration Panel
 st.sidebar.header("🕹️ Control Dashboard")
@@ -59,13 +65,13 @@ st.sidebar.subheader("📦 Data Source Options")
 
 # Option #1: The Built-in Testing Samples toggle checkbox
 use_samples = st.sidebar.checkbox("Load Built-In Cloud Samples", value=True, 
-                                  help="Enables quick system testing with internet images if you don't have local files ready.")
+                                  help="Enables quick system testing with generated images if you don't have local files ready.")
 
-# Define public domain image URLs for zero-setup demo testing
+# Fixed internal sample system
 SAMPLE_URLS = [
-    {"name": "cloud_cat.jpg", "url": "https://wikimedia.org"},
-    {"name": "cloud_car.jpg", "url": "https://wikimedia.org"},
-    {"name": "cloud_dog.jpg", "url": "https://wikimedia.org"}
+    {"name": "internal_sample_cat.jpg", "url": "local"},
+    {"name": "internal_sample_car.jpg", "url": "local"},
+    {"name": "internal_sample_nature.jpg", "url": "local"}
 ]
 
 # Primary list to hold combined inputs
@@ -110,13 +116,13 @@ if aggregated_media_queue and concepts:
     
     # Initialize dictionary categorization buckets
     output_buckets = {c: [] for c in concepts}
-    output_buckets["unclassified"] = []
+    output_buckets["unclassified"] = []  # The Ungrouped bucket
     
     for asset in aggregated_media_queue:
         name = asset["name"]
         _, file_extension = os.path.splitext(name.lower())
         if not file_extension:
-            file_extension = ".jpg" # Base image fallback pattern
+            file_extension = ".jpg"
             
         target_bytes = None
         
@@ -124,8 +130,8 @@ if aggregated_media_queue and concepts:
         if asset["data_source"] == "bytes":
             target_bytes = asset["raw_bytes"]
         elif asset["data_source"] == "url":
-            with st.spinner(f"Streaming background asset matrix: {name}..."):
-                target_bytes = fetch_sample_bytes(asset["url_link"])
+            with st.spinner(f"Generating memory asset matrix: {name}..."):
+                target_bytes = fetch_sample_bytes(asset["name"])
                 
         if target_bytes is None:
             st.error(f"Skipped asset line item processing for: {name}")
@@ -158,25 +164,31 @@ if aggregated_media_queue and concepts:
             else:
                 assigned_category = "unclassified"
                 
+            origin_type = "Built-In Sample" if asset["data_source"] == "url" else "External Upload"
+            
             output_buckets[assigned_category].append({
                 "name": name,
                 "frame": parsed_visual_matrix,
                 "score": max_confidence_score,
-                "origin": "Built-In Sample" if asset["data_source"] == "url" else "External Upload"
+                "origin": origin_type
             })
-            st.success(f"⚡ Mapped **{name}** ({asset['origin_type'] if 'origin_type' in asset else asset['data_source'].upper()}) -> **[{assigned_category.upper()}]**")
+            st.success(f"⚡ Mapped **{name}** ({origin_type.upper()}) -> **[{assigned_category.upper()}]**")
         else:
             st.error(f"⚠️ Formatting error parsing input streams for file: {name}")
 
     # ========================================================
-    # WEB UI RENDERING GRID
+    # WEB UI RENDERING GRID (FIXED FOR UNGROUPED ITEMS)
     # ========================================================
     st.write("---")
     st.subheader("📂 Dynamic Virtual Output Folders")
     
+    # Loop over all buckets inside output_buckets rather than just user concepts
     for group_title, contents_list in output_buckets.items():
         if contents_list:
-            with st.expander(f"📁 {group_title.upper()} ({len(contents_list)} items grouped)", expanded=True):
+            # Highlight unclassified items cleanly for user clarity
+            display_title = f"⚠️ {group_title.upper()} / UNGROUPED" if group_title == "unclassified" else f"📁 {group_title.upper()}"
+            
+            with st.expander(f"{display_title} ({len(contents_list)} items grouped)", expanded=True):
                 grid_columns = st.columns(4)
                 for index, grid_item in enumerate(contents_list):
                     with grid_columns[index % 4]:
