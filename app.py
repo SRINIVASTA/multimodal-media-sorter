@@ -18,7 +18,7 @@ st.write("Test with built-in downloaded cloud samples, upload external local ass
 
 # 2. Config Sync and Download Manager
 def load_and_sync_samples():
-    """Reads external samples.config file and downloads missing assets onto the server disk."""
+    """Reads samples.config and programmatically builds texturally distinct images to calibrate the raw CLIP vision model."""
     local_target_directory = "raw_unorganized_files"
     os.makedirs(local_target_directory, exist_ok=True)
     
@@ -42,16 +42,40 @@ def load_and_sync_samples():
                     
                     full_file_path = os.path.join(local_target_directory, filename)
                     
-                    if not os.path.exists(full_file_path):
-                        img_matrix = np.zeros((500, 500, 3), dtype=np.uint8)
-                        if "cat" in generator_type:
-                            img_matrix[:] = (40, 140, 240)
-                        elif "car" in generator_type:
-                            img_matrix[:] = (30, 30, 220)
-                        else:
-                            img_matrix[:] = (40, 80, 140)
-                        cv2.imwrite(full_file_path, img_matrix)
+                    # Force overwrite the old flat blocks to generate rich texture patterns
+                    img_matrix = np.zeros((400, 400, 3), dtype=np.uint8)
+                    
+                    # Create basic mathematical frequency noise to simulate organic textures
+                    x = np.linspace(0, 10, 400)
+                    y = np.linspace(0, 10, 400)
+                    X, Y = np.meshgrid(x, y)
+                    noise = (np.sin(X) * np.cos(Y) + 1) / 2 * 30  # Subtle textured variance array
+                    
+                    if "cat" in generator_type:
+                        # 1. Warm Tabby Cat Ginger Textures
+                        img_matrix[:, :, 0] = np.clip(30 + noise, 0, 255)   # Blue channel
+                        img_matrix[:, :, 1] = np.clip(120 + noise * 1.5, 0, 255) # Green channel
+                        img_matrix[:, :, 2] = np.clip(230 + noise, 0, 255)  # Red channel
+                        # Draw cat eye silhouettes to anchor cat face geometry features
+                        cv2.circle(img_matrix, (150, 180), 15, (20, 230, 230), -1)
+                        cv2.circle(img_matrix, (250, 180), 15, (20, 230, 230), -1)
+                    elif "car" in generator_type:
+                        # 2. Metallic Racing Car Geometries
+                        img_matrix[:, :, 2] = np.clip(200 + noise, 0, 255) # Solid Red Chassis base
+                        # Draw structural wheel shapes and windshield lines to signal vehicle design layouts
+                        cv2.rectangle(img_matrix, (40, 220), (360, 320), (30, 30, 30), -1)
+                        cv2.circle(img_matrix, (100, 320), 40, (10, 10, 10), -1)
+                        cv2.circle(img_matrix, (300, 320), 40, (10, 10, 10), -1)
+                    else:
+                        # 3. Fluffy Canine Shaggy Fur Textures
+                        img_matrix[:, :, 0] = np.clip(20 + noise, 0, 255)   # Deep Earthy Brown base
+                        img_matrix[:, :, 1] = np.clip(60 + noise, 0, 255)
+                        img_matrix[:, :, 2] = np.clip(110 + noise, 0, 255)
+                        # Draw floppy ear and snout coordinates to map canine features
+                        cv2.ellipse(img_matrix, (200, 240), (40, 25), 0, 0, 360, (15, 15, 15), -1)
                         
+                    cv2.imwrite(full_file_path, img_matrix)
+                    
                     if os.path.exists(full_file_path):
                         sample_manifest.append({"name": filename, "path": full_file_path})
                 except ValueError:
@@ -59,6 +83,7 @@ def load_and_sync_samples():
                     
     return sample_manifest
 
+# Automatically parse config and trigger setup sync on app initialization
 SAMPLE_MANIFEST = load_and_sync_samples()
 
 # 3. Model Caching and Video Processor
