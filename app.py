@@ -27,15 +27,10 @@ def load_and_sync_samples():
             if line and not line.startswith("#"): 
                 try: 
                     filename, generator_type = line.split(",", 1) 
-                    filename = filename.strip() 
-                    generator_type = generator_type.strip() 
+                    filename, generator_type = filename.strip(), generator_type.strip() 
  
                     full_file_path = os.path.join(local_target_directory, filename) 
- 
-                    # Force overwrite the old flat blocks to generate rich texture patterns 
                     img_matrix = np.zeros((400, 400, 3), dtype=np.uint8) 
- 
-                    # Optimized random variance noise
                     noise = np.random.randint(0, 30, (400, 400), dtype=np.uint8)
  
                     if "cat" in generator_type: 
@@ -56,12 +51,10 @@ def load_and_sync_samples():
                         cv2.ellipse(img_matrix, (200, 240), (40, 25), 0, 0, 360, (15, 15, 15), -1) 
  
                     cv2.imwrite(full_file_path, img_matrix) 
- 
                     if os.path.exists(full_file_path): 
                         sample_manifest.append({"name": filename, "path": full_file_path}) 
                 except ValueError: 
                     pass 
- 
     return sample_manifest
 # 2. Model Caching and Video Processor Interface
 @st.cache_resource 
@@ -76,7 +69,6 @@ def extract_video_frame(file_bytes, ext):
  
     cap = cv2.VideoCapture(temp_path) 
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) 
- 
     frame_checkpoints = [total_frames // 4, total_frames // 2, (3 * total_frames) // 4] 
     captured_frames = [] 
  
@@ -93,23 +85,19 @@ def extract_video_frame(file_bytes, ext):
     if len(captured_frames) > 0: 
         averaged_matrix = np.mean(captured_frames, axis=0).astype(np.uint8) 
         return Image.fromarray(averaged_matrix) 
- 
     return None 
-# 3. Main Streamlit Execution Guard Structure
+# 3. Main Streamlit Execution UI Block
 def main():
     st.set_page_config(page_title="Universal Media Organizer", layout="wide") 
-    st.title("📁 AI Multi-Source Unsupervised Media Organizer") 
+    st.title("📁 Free Multi-Source Unsupervised Media Organizer") 
     st.write("Test with built-in downloaded cloud samples, upload external local assets, or combine both sources seamlessly.") 
 
-    # Clean local disk asset instantiation sync loops
     SAMPLE_MANIFEST = load_and_sync_samples() 
-    model = load_clip_model() 
+    model = load_clip_model() # Isolated inside main to protect test execution limits
 
     st.sidebar.header("🕹️ Control Dashboard") 
     raw_concepts = st.sidebar.text_input("Target Grouping Keywords:", "cat, dog, car, nature") 
     concepts = [c.strip().lower() for c in raw_concepts.split(",") if c.strip()] 
-    
-    # NEW: Confidence slider recalibrated from 0.26 up to 0.50 to baseline true percentage weights
     confidence_threshold = st.sidebar.slider("AI Confidence Cutoff Threshold (Percentage scale)", 0.0, 1.0, 0.50)
     st.sidebar.write("---") 
     st.sidebar.subheader("📊 Data Source Options") 
@@ -185,13 +173,10 @@ def main():
                 extracted_vector = model.encode(parsed_visual_matrix) 
      
             if extracted_vector is not None and parsed_visual_matrix is not None and target_bytes is not None: 
-                # Normalize vector weights to unit scale 
                 normalized_vector = extracted_vector / np.linalg.norm(extracted_vector) 
-                
-                # 1. Fetch raw matrix similarity cosine metrics
                 match_scores = np.dot(concept_embeddings, normalized_vector) 
                 
-                # 2. NEW: Stretch and normalize raw cosine array into relative probability scaling
+                # OpenAI standard logit scaling and Softmax processing logic
                 logit_scores = match_scores * 100.0
                 exp_scores = np.exp(logit_scores - np.max(logit_scores))
                 probabilities = exp_scores / np.sum(exp_scores)
@@ -244,7 +229,7 @@ def main():
                 similarity = np.dot(item["vector"], query_vector) 
                 search_results.append((similarity, item)) 
      
-            search_results.sort(key=lambda x: x[0], reverse=True) 
+            search_results.sort(key=lambda x: x, reverse=True) 
             st.write(f"Showing best matching files for: *\"{search_query}\"*") 
             
             search_cols = st.columns(4) 
