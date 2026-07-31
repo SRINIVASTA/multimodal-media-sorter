@@ -7,4 +7,5 @@ scikit-learn
 requests
 plotly
 pytest
+torch
 torchvision
