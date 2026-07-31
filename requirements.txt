@@ -5,7 +5,4 @@ opencv-python-headless
 numpy
 scikit-learn
 requests
-plotly
 pytest
-torch
-torchvision
