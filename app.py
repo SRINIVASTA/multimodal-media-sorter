@@ -5,8 +5,6 @@ import tempfile
 import os 
 import requests 
 import zipfile 
-import plotly.express as px 
-import pandas as pd 
 from io import BytesIO 
 from PIL import Image 
 from sentence_transformers import SentenceTransformer 
@@ -45,8 +43,7 @@ def load_and_sync_samples():
                     # Force overwrite the old flat blocks to generate rich texture patterns 
                     img_matrix = np.zeros((400, 400, 3), dtype=np.uint8) 
  
-                    # OPTIMIZED: Replaced meshgrid sin/cos loops with high-speed random variance
-                    # This drastically reduces structural tech debt metrics for underwriting scans
+                    # Highly optimized random structural variance array
                     noise = np.random.randint(0, 30, (400, 400), dtype=np.uint8)
  
                     if "cat" in generator_type: 
@@ -279,37 +276,6 @@ if aggregated_media_queue and concepts:
             with search_cols[idx % 4]: 
                 st.image(item["frame"], use_container_width=True) 
                 st.caption(f"**{item['name']}**\n\nSemantic Relevance: {sim_score:.2f}") 
-
-    # 7. Dynamic Plotly Horizontal Bar Visualizations 
-    st.write("---") 
-    st.subheader("📈 AI Semantic Confidence Analytics") 
- 
-    chart_data = [] 
-    for group_title, contents_list in output_buckets.items(): 
-        for item in contents_list: 
-            chart_data.append({ 
-                "File Name": item["name"], 
-                "Assigned Group": group_title.upper(), 
-                "AI Confidence Score": round(float(item["score"]), 3), 
-                "Data Source": item["origin"] 
-            }) 
- 
-    if chart_data: 
-        df = pd.DataFrame(chart_data) 
-        df = df.sort_values(by="AI Confidence Score", ascending=True) 
- 
-        fig = px.bar( 
-            df, x="AI Confidence Score", y="File Name", color="Assigned Group", 
-            orientation="h", text="AI Confidence Score", hover_data=["Data Source"], 
-            color_discrete_map={"CAT": "#FF9E2A", "DOG": "#8E542D", "CAR": "#DC143C", "NATURE": "#228B22", "UNCLASSIFIED": "#808080"}, 
-            labels={"AI Confidence Score": "Matching Score (0.0 to 1.0)"} 
-        ) 
-        fig.update_layout( 
-            barmode="stack", height=max(300, len(chart_data) * 45), xaxis_range=[0, 1.05], 
-            margin=dict(l=20, r=20, t=10, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1) 
-        ) 
-        fig.update_traces(textposition='outside', cliponaxis=False) 
-        st.plotly_chart(fig, use_container_width=True) 
  
     # 8. Web Export Download Interface Button Placement 
     st.write("---") 
