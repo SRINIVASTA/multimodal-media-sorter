@@ -1,5 +1,15 @@
-# test_app.py
 import os
+import sys
+from unittest.mock import MagicMock
+
+# Create a fake Streamlit mock object to stop decorators from crashing the test environment
+mock_st = MagicMock()
+mock_st.cache_resource = lambda x=None, *args, **kwargs: x if callable(x) else lambda f: f
+
+# Inject the mock directly into the active Python system modules
+sys.modules['streamlit'] = mock_st
+
+# NOW it is completely safe to import your app code without triggering Streamlit errors
 import pytest
 from app import load_and_sync_samples
 
