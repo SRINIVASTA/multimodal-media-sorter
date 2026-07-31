@@ -24,7 +24,6 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libgl1-mesa-glx libglib2.0-0
 
-    # Explicitly patches the memory footprint to use lightweight CPU wheels
     - name: Pre-Install Lightweight CPU ML Base
       run: |
         python -m pip install --upgrade pip
