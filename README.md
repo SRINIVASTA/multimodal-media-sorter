@@ -17,7 +17,6 @@ An advanced, free, and completely web-based unsupervised machine learning applic
 * **Dynamic Content Search**: A built-in cross-modal semantic search prompt allows users to write natural sentences to query and filter the active media pool on the fly.
 * **Smart Cutoff Sliders**: Adjust confidence thresholds dynamically to let real photographic pixels pass into target folders while isolating low-contrast dummy blocks into an Ungrouped drawer.
 * **One-Click Local Exports**: Packages organized virtual outputs into physical subdirectory tree archives (`/cat`, `/dog`, `/car`) inside a single structured `.zip` download wrapper.
-* **Automated Quality Testing**: Integrated with a robust `pytest` pipeline configuration to guarantee modular execution stability across server environment changes.
 
 ---
 
@@ -27,12 +26,9 @@ An advanced, free, and completely web-based unsupervised machine learning applic
 multimodal-media-sorter/
 ├── .streamlit/
 │   └── config.toml       # Headless server environment and custom theme configurations
-├── .github/workflows/
-│   └── test.yml          # GitHub Actions continuous integration testing pipeline
 ├── app.py                # Core Python application managing the AI & Streamlit layers
-├── test_app.py           # Automated unit testing file validating pipeline modules
-├── requirements.txt      # Automated Linux server deployment configurations
-├── samples.config        # Decoupled text catalog handling sample filenames and URLs
+├── requirements.txt      # Automated server deployment configurations
+├── samples.config        # Decoupled text catalog handling sample configuration tags
 └── README.md             # Project documentation page guidelines
 ```
 
@@ -44,12 +40,6 @@ test_car.jpg,generate_car_pattern
 test_dog.jpg,generate_dog_pattern
 ```
 
----
-
-## 🧪 Automated Code Testing
-To verify code structural compliance and ensure zero regressions across environment changes, run your test suite locally:
-```bash
-pytest test_app.py -v
 ```
 
 *Created by Srinivasta — Powered by Open-Source Artificial Intelligence.*
