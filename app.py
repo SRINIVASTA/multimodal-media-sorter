@@ -108,7 +108,9 @@ def main():
     st.sidebar.header("🕹️ Control Dashboard") 
     raw_concepts = st.sidebar.text_input("Target Grouping Keywords:", "cat, dog, car, nature") 
     concepts = [c.strip().lower() for c in raw_concepts.split(",") if c.strip()] 
-    confidence_threshold = st.sidebar.slider("AI Confidence Cutoff Threshold", 0.0, 1.0, 0.26)
+    
+    # NEW: Confidence slider recalibrated from 0.26 up to 0.50 to baseline true percentage weights
+    confidence_threshold = st.sidebar.slider("AI Confidence Cutoff Threshold (Percentage scale)", 0.0, 1.0, 0.50)
     st.sidebar.write("---") 
     st.sidebar.subheader("📊 Data Source Options") 
     use_samples = st.sidebar.checkbox("Load Built-In Cloud Samples", value=True) 
@@ -183,10 +185,19 @@ def main():
                 extracted_vector = model.encode(parsed_visual_matrix) 
      
             if extracted_vector is not None and parsed_visual_matrix is not None and target_bytes is not None: 
+                # Normalize vector weights to unit scale 
                 normalized_vector = extracted_vector / np.linalg.norm(extracted_vector) 
+                
+                # 1. Fetch raw matrix similarity cosine metrics
                 match_scores = np.dot(concept_embeddings, normalized_vector) 
-                top_match_idx = np.argmax(match_scores) 
-                max_confidence_score = match_scores[top_match_idx] 
+                
+                # 2. NEW: Stretch and normalize raw cosine array into relative probability scaling
+                logit_scores = match_scores * 100.0
+                exp_scores = np.exp(logit_scores - np.max(logit_scores))
+                probabilities = exp_scores / np.sum(exp_scores)
+                
+                top_match_idx = np.argmax(probabilities) 
+                max_confidence_score = probabilities[top_match_idx] 
      
                 if max_confidence_score >= confidence_threshold: 
                     assigned_category = concepts[top_match_idx] 
@@ -200,7 +211,7 @@ def main():
      
                 output_buckets[assigned_category].append(item_payload) 
                 all_processed_items.append(item_payload) 
-                st.success(f"✅ Mapped **{name}** ({origin_type.upper()}) -> **[{assigned_category.upper()}]**") 
+                st.success(f"✅ Mapped **{name}** ({origin_type.upper()}) -> **[{assigned_category.upper()}]** with {max_confidence_score*100:.1f}% Confidence") 
             else: 
                 st.error(f"❌ Formatting error parsing input stream for: {name}") 
      
@@ -217,7 +228,7 @@ def main():
                         for index, grid_item in enumerate(contents_list): 
                             with grid_columns[index % 4]: 
                                 st.image(grid_item["frame"], use_container_width=True) 
-                                st.caption(f"**Name:** {grid_item['name']}\n\n**Source:** {grid_item['origin']}\n\n**Confidence:** {grid_item['score']:.2f}") 
+                                st.caption(f"**Name:** {grid_item['name']}\n\n**Source:** {grid_item['origin']}\n\n**Confidence:** {grid_item['score']*100:.1f}%") 
                             archive_path = f"{group_title}/{grid_item['name']}" 
                             zip_file.writestr(archive_path, grid_item["raw_file_bytes"]) 
      
