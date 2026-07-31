@@ -24,14 +24,10 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libgl1-mesa-glx libglib2.0-0
 
-    - name: Pre-Install Lightweight CPU ML Base
+    - name: Install Lightweight Testing Framework
       run: |
         python -m pip install --upgrade pip
-        pip install torch torchvision --index-url https://pytorch.org
-
-    - name: Install Remaining Architecture Dependencies
-      run: |
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install pytest streamlit opencv-python-headless numpy requests
 
     - name: Execute Pytest Validation Gate
       run: |
