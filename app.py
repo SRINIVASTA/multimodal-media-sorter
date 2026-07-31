@@ -89,7 +89,7 @@ def extract_video_frame(file_bytes, ext):
 # 3. Main Streamlit Execution UI Block
 def main():
     st.set_page_config(page_title="Universal Media Organizer", layout="wide") 
-    st.title("📁 Free Multi-Source Unsupervised Media Organizer") 
+    st.title("📁 AI Multi-Source Media Organizer") 
     st.write("Test with built-in downloaded cloud samples, upload external local assets, or combine both sources seamlessly.") 
 
     SAMPLE_MANIFEST = load_and_sync_samples() 
