@@ -1,22 +1,18 @@
 # 📂 AI Multi-Source Unsupervised Media Organizer
+Developed with ❤️ by [Srinivasta](https://github.com/SRINIVASTA)
 
-Developed with ❤️ by **Srinivasta**
+[Live Application URL](https://srinivasta.github.io)
 
-**Live Application URL:** [AI Multi-Source Unsupervised Media Organizer](https://multimodal-media-sorter-zg3j83appudnqpfhyhutucc.streamlit.app/)
-
-
-An advanced, free, and completely web-based unsupervised machine learning application built with **Streamlit** and **OpenAI's CLIP model**. This application automatically interprets, aligns, and categorizes unstructured text, images, and video frames by their true conceptual meaning, completely bypassing the traditional multi-modal formatting gap.
-
----
+An advanced, free, and completely web-based unsupervised machine learning application built with Streamlit and OpenAI's CLIP model. This application automatically interprets, aligns, and categorizes unstructured text, images, and video frames by their true conceptual meaning, completely bypassing the traditional multi-modal formatting gap.
 
 ## 🚀 Key Features
 
-* **Zero Cloud Costs**: Powered entirely by open-source models (`clip-ViT-B-32`) running natively inside memory containers—no paid API keys, credits, or registration required.
-* **Dual-Input Engine**: Test out-of-the-box using background-downloaded cloud sample paths or drag-and-drop your own personal `.png`, `.jpg`, or `.mp4` files seamlessly.
-* **Industry-Standard Softmax Scaling**: Translates raw machine learning distances into human-readable matching metrics, providing clear confidence scores up to 99.9%.
-* **Dynamic Content Search**: A built-in cross-modal semantic search prompt allows users to write natural sentences to query and filter the active media pool on the fly.
-* **Smart Cutoff Sliders**: Adjust confidence thresholds dynamically to let real photographic pixels pass into target folders while isolating low-contrast dummy blocks into an Ungrouped drawer.
-* **One-Click Local Exports**: Packages organized virtual outputs into physical subdirectory tree archives (`/cat`, `/dog`, `/car`) inside a single structured `.zip` download wrapper.
+* **Zero Cloud Costs:** Powered entirely by open-source models (`clip-ViT-B-32`) running natively inside memory containers—no paid API keys, credits, or registration required.
+* **Dual-Input Engine:** Test out-of-the-box using background-downloaded cloud sample paths or drag-and-drop your own personal `.png`, `.jpg`, or `.mp4` files seamlessly.
+* **Industry-Standard Softmax Scaling:** Translates raw machine learning distances into human-readable matching metrics, providing clear confidence scores up to 99.9%.
+* **Dynamic Content Search:** A built-in cross-modal semantic search prompt allows users to write natural sentences to query and filter the active media pool on the fly.
+* **Smart Cutoff Sliders:** Adjust confidence thresholds dynamically to let real photographic pixels pass into target folders while isolating low-contrast dummy blocks into an *Ungrouped* drawer.
+* **One-Click Local Exports:** Packages organized virtual outputs into physical subdirectory tree archives (`/cat`, `/dog`, `/car`) inside a single structured `.zip` download wrapper.
 
 ---
 
@@ -32,15 +28,19 @@ multimodal-media-sorter/
 └── README.md             # Project documentation page guidelines
 ```
 
-### 2. Samples Configuration (`samples.config`)
+---
+
+## ⚙️ Samples Configuration (`samples.config`)
+
 Populate your testing file using a comma-separated filename and direct URL layout:
-```text
+
+```csv
 test_cat.jpg,generate_cat_pattern
 test_car.jpg,generate_car_pattern
 test_dog.jpg,generate_dog_pattern
+```
 
-
-* **Underwriting Policy Target:** Verified Clean Code Ingestions drop computed portfolio penalties down to a baseline **₹0 Total Liability**.
+> 🛡️ **Underwriting Policy Target:** Verified Clean Code Ingestions drop computed portfolio penalties down to a baseline **₹0 Total Liability**.
 
 ---
 
