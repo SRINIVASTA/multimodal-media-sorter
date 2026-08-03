@@ -42,9 +42,10 @@ test_dog.jpg,generate_dog_pattern
 
 ```
 
-*Created by Srinivasta — Powered by Open-Source Artificial Intelligence.*
 
 * **Underwriting Policy Target:** Verified Clean Code Ingestions drop computed portfolio penalties down to a baseline **₹0 Total Liability**.
+
+## 📄 License & Copyright
 
 > ⚠️ **IMPORTANT COPYRIGHT NOTICE**
 > 
@@ -59,7 +60,4 @@ test_dog.jpg,generate_dog_pattern
 - [![Kaggle](https://img.shields.io/badge/Kaggle-20BEFF?style=for-the-badge&logo=kaggle&logoColor=white)](https://www.kaggle.com/srinivasta)  
 - [![Email](https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:tasrinivass@gmail.com)  
 - [![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/srinivasta)
-- [![Website](https://img.shields.io/badge/Website-000000?style=for-the-badge&logo=website&logoColor=white)](https://srinivasta/github.io)
-
-
-
+- [![Website](https://img.shields.io/badge/Website-000000?style=for-the-badge&logo=website&logoColor=white)](https://srinivasta.github.io)
