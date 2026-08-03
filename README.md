@@ -38,9 +38,6 @@ Populate your testing file using a comma-separated filename and direct URL layou
 test_cat.jpg,generate_cat_pattern
 test_car.jpg,generate_car_pattern
 test_dog.jpg,generate_dog_pattern
-```
-
-```
 
 
 * **Underwriting Policy Target:** Verified Clean Code Ingestions drop computed portfolio penalties down to a baseline **₹0 Total Liability**.
