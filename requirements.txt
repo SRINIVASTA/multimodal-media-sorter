@@ -6,3 +6,4 @@ numpy
 scikit-learn
 requests
 pytest
+starlette<0.40.0
